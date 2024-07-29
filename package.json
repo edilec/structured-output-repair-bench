@@ -1,0 +1,17 @@
+{
+  "name": "structured-output-repair-bench",
+  "version": "0.0.0",
+  "description": "Benchmark structured-output repair strategies against malformed model responses.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/edilec/structured-output-repair-bench"
+  }
+}
