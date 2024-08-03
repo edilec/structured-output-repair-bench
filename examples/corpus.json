@@ -1,0 +1,79 @@
+{
+  "corpusVersion": "1",
+  "schema": {
+    "type": "object",
+    "required": [
+      "currency",
+      "id",
+      "total"
+    ],
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "total": {
+        "type": "number",
+        "minimum": 0
+      },
+      "currency": {
+        "type": "string",
+        "enum": [
+          "EUR",
+          "USD"
+        ]
+      },
+      "note": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "records": [
+    {
+      "id": "fenced",
+      "raw": "```json\n{\"id\": \"A-1\", \"total\": 12.5, \"currency\": \"EUR\"}\n```",
+      "expected": {
+        "id": "A-1",
+        "total": 12.5,
+        "currency": "EUR"
+      }
+    },
+    {
+      "id": "prose-around-it",
+      "raw": "Sure! Here is the JSON you asked for: {\"id\": \"A-2\", \"total\": 40, \"currency\": \"USD\"} Let me know if you need anything else.",
+      "expected": {
+        "id": "A-2",
+        "total": 40,
+        "currency": "USD"
+      }
+    },
+    {
+      "id": "truncated",
+      "raw": "{\"id\": \"A-3\", \"total\": 7.25, \"currency\": \"USD\"",
+      "expected": {
+        "id": "A-3",
+        "total": 7.25,
+        "currency": "USD"
+      }
+    },
+    {
+      "id": "trailing-comma",
+      "raw": "{\"id\": \"A-4\", \"total\": 3, \"currency\": \"EUR\",}",
+      "expected": {
+        "id": "A-4",
+        "total": 3,
+        "currency": "EUR"
+      }
+    },
+    {
+      "id": "single-quotes",
+      "raw": "{'id': 'A-5', 'total': 99, 'currency': 'USD'}",
+      "expected": {
+        "id": "A-5",
+        "total": 99,
+        "currency": "USD"
+      }
+    }
+  ]
+}

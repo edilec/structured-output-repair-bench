@@ -1,0 +1,62 @@
+{
+  "corpusVersion": "1",
+  "schema": {
+    "type": "object",
+    "required": [
+      "currency",
+      "id",
+      "total"
+    ],
+    "properties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "total": {
+        "type": "number",
+        "minimum": 0
+      },
+      "currency": {
+        "type": "string",
+        "enum": [
+          "EUR",
+          "USD"
+        ]
+      },
+      "note": {
+        "type": "string"
+      }
+    },
+    "additionalProperties": false
+  },
+  "records": [
+    {
+      "id": "comma-inside-a-string",
+      "raw": "{\"id\": \"B-1\", \"total\": 5, \"currency\": \"EUR\", \"note\": \"totals: 1,}\",}",
+      "expected": {
+        "id": "B-1",
+        "total": 5,
+        "currency": "EUR",
+        "note": "totals: 1,}"
+      }
+    },
+    {
+      "id": "truncated-mid-value",
+      "raw": "{\"id\": \"B-2\", \"total\": 7.25, \"currency\": \"EU",
+      "expected": {
+        "id": "B-2",
+        "total": 7.25,
+        "currency": "EUR"
+      }
+    },
+    {
+      "id": "refusal-not-json",
+      "raw": "Sorry, I cannot produce JSON for that request.",
+      "expected": {
+        "id": "B-3",
+        "total": 0,
+        "currency": "USD"
+      }
+    }
+  ]
+}
