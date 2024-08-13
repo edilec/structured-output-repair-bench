@@ -48,6 +48,42 @@ test('strip-code-fence removes a fence and leaves unfenced text alone', () => {
   assert.equal(run(['strip-code-fence'], '{"a":1}').edits, 0)
 })
 
+test('the closing fence is recognised in every shape the pattern it replaced accepted', () => {
+  /*
+   * The closing fence used to be `/\r?\n?[ \t]*```[ \t]*$/`, which is
+   * quadratic on a payload holding a long run of spaces. It was replaced by a
+   * single backward scan -- and a scan that simply stopped recognising fences
+   * would be fast, correct-looking and useless, so every shape the old pattern
+   * accepted is listed here: the optional line break in all three of its forms,
+   * blanks either side of the backticks, and the cases where there is no fence
+   * to strip at all.
+   */
+  const cases = [
+    ['```json\n{"a":1}\n```', '{"a":1}'],
+    ['```json\r\n{"a":1}\r\n```', '{"a":1}'],
+    ['```json\n{"a":1}\r```', '{"a":1}'],
+    ['```json\n{"a":1}```', '{"a":1}'],
+    ['```json\n{"a":1}\n   ```   ', '{"a":1}'],
+    ['```json\n{"a":1}\n\t```\t', '{"a":1}'],
+    // A payload whose own content is a long run of blanks: the shape that made
+    // the old pattern take seconds. The fence around it still comes off.
+    [`\`\`\`json\n{"note": "${' '.repeat(4000)}"}\n\`\`\``, `{"note": "${' '.repeat(4000)}"}`],
+    // No fence: the text is returned untouched, and so is text whose backticks
+    // are not at the end.
+    ['{"a":1}', '{"a":1}'],
+    ['{"a":"``"}', '{"a":"``"}'],
+    ['{"a":1}\n``', '{"a":1}\n``'],
+  ]
+  for (const [raw, expected] of cases) {
+    assert.equal(repaired(['strip-code-fence'], raw), expected, `strip-code-fence mangled ${JSON.stringify(raw.slice(0, 40))}`)
+  }
+  // The edit count still distinguishes a fence that was there from one that
+  // was not, because `edits` is a measured column on the scoreboard.
+  assert.equal(run(['strip-code-fence'], '```\n{"a":1}\n```').edits, 2)
+  assert.equal(run(['strip-code-fence'], '{"a":1}\n```').edits, 1)
+  assert.equal(run(['strip-code-fence'], '{"a":1}').edits, 0)
+})
+
 test('extract-json-span keeps the first balanced object and drops the prose', () => {
   assert.equal(repaired(['extract-json-span'], 'Sure: {"a":1} hope that helps'), '{"a":1}')
   assert.equal(repaired(['extract-json-span'], 'Sure: [1,2] done'), '[1,2]')

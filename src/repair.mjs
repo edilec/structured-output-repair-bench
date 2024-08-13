@@ -11,7 +11,9 @@
  *
  * Every primitive is a pure function of its text. None reads the clock, the
  * environment, the filesystem or a locale, and none is a regular expression
- * whose work can grow faster than the length of its input.
+ * whose work can grow faster than the length of its input -- a claim that is
+ * now measured by `test/complexity.test.mjs` rather than asserted here, because
+ * the closing-fence pattern this comment used to sit above was quadratic.
  */
 
 /** Every primitive, by the id a pipeline names it with. */
@@ -68,8 +70,43 @@ export function analyse(text) {
   return { inString, openers, endedInString: insideString, danglingEscape: escaped, start, end }
 }
 
+/*
+ * `FENCE_OPEN` is anchored with `^`, so the engine tries exactly one starting
+ * position and the whole match is linear in the text it consumes.
+ *
+ * There is deliberately no `FENCE_CLOSE` regular expression beside it. The
+ * obvious one, `/\r?\n?[ \t]*```[ \t]*$/`, is anchored only at the END: the
+ * engine retries it at every index, and at each index the greedy `[ \t]*` walks
+ * to the end of a run of spaces and backtracks over all of it before failing.
+ * That is quadratic, and measured here rather than feared -- on a payload whose
+ * only content is a run of spaces it took 29 ms at 5 kB, 108 ms at 10 kB,
+ * 574 ms at 20 kB and 2175 ms at 40 kB, four times the work for twice the
+ * input. A single record at the documented-legal maxRawBytes made the whole
+ * bench take ten seconds, in three of the four built-in presets, because
+ * `strip-code-fence` is their first step.
+ */
 const FENCE_OPEN = /^[ \t]*```[A-Za-z0-9_+-]*[ \t]*\r?\n?/
-const FENCE_CLOSE = /\r?\n?[ \t]*```[ \t]*$/
+
+const isBlank = (character) => character === ' ' || character === '\t'
+
+/**
+ * Where a trailing ``` fence begins, or -1.
+ *
+ * One backward scan, each character visited at most once. It accepts exactly
+ * what `/\r?\n?[ \t]*```[ \t]*$/` accepted: blanks to the end, the three
+ * backticks, blanks before them, then an optional line break which may be
+ * "\n", "\r\n" or a lone "\r".
+ */
+function closingFenceStart(text) {
+  let end = text.length
+  while (end > 0 && isBlank(text[end - 1])) end -= 1
+  if (end < 3 || text[end - 1] !== '`' || text[end - 2] !== '`' || text[end - 3] !== '`') return -1
+  let start = end - 3
+  while (start > 0 && isBlank(text[start - 1])) start -= 1
+  if (start > 0 && text[start - 1] === '\n') start -= 1
+  if (start > 0 && text[start - 1] === '\r') start -= 1
+  return start
+}
 
 /** Remove a Markdown code fence wrapped around the payload. */
 function stripCodeFence(text) {
@@ -79,8 +116,9 @@ function stripCodeFence(text) {
     out = out.replace(FENCE_OPEN, '')
     edits += 1
   }
-  if (FENCE_CLOSE.test(out)) {
-    out = out.replace(FENCE_CLOSE, '')
+  const closing = closingFenceStart(out)
+  if (closing !== -1) {
+    out = out.slice(0, closing)
     edits += 1
   }
   return { text: edits === 0 ? text : out, edits }
