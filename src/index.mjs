@@ -395,6 +395,7 @@ export function benchRepairs(input = {}) {
 
 function runCorpus(context) {
   const { collector, corpus, strategies, scores, limits, state, budget, deadline, corpusSource } = context
+  let lastScored = null
 
   for (const entry of corpus.records) {
     if (deadline.exceeded()) {
@@ -422,6 +423,7 @@ function runCorpus(context) {
     }
 
     state.records += 1
+    lastScored = entry
     const labelProblems = validateAgainstSchema(entry.expected, corpus.schema, limits, budget)
     reportLabelProblems(collector, labelProblems, entry, corpusSource)
 
@@ -440,6 +442,27 @@ function runCorpus(context) {
         suggestion: 'Add a strategy that handles this shape, or accept the record as out of reach and say so.',
       })
     }
+  }
+
+  /*
+   * The budget, sampled once more after the loop.
+   *
+   * The check at the top of the loop only ever asks "had the budget run out
+   * before this record?", so it cannot see a budget blown DURING the last
+   * record -- there is no next iteration to ask in. Measured: one record at the
+   * documented-legal maxRawBytes, `--max-millis 1`, twelve seconds of wall
+   * clock, and a report saying `pass` with no findings. A limit is not enforced
+   * if the only run that can exceed it is the run that never gets checked.
+   */
+  if (lastScored !== null && deadline.exceeded()) {
+    record(collector, {
+      ruleId: 'time-budget-exceeded',
+      file: corpusSource,
+      position: lastScored.index,
+      parts: lastScored.parts,
+      message: `The bench passed the maxMillis budget of ${limits.maxMillis} while scoring this record; a run that overran its budget is not a measurement to compare another run against.`,
+      suggestion: 'Raise --max-millis deliberately, or shorten the corpus.',
+    })
   }
 }
 
@@ -509,6 +532,7 @@ function scoreAttempt(context) {
     })
     return 'failed'
   }
+
   score.parsed += 1
 
   const depth = measureDepth(parsed, limits.maxValueDepth)

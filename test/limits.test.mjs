@@ -164,3 +164,48 @@ test('an abandoned attempt is counted as abandoned, never as parsed or faithful'
   assert.equal(score.faithful, 0)
   assert.equal(report.summary.checked, 0)
 })
+
+test('a time budget blown while scoring the LAST record is reported, not passed over', () => {
+  /*
+   * The clock is injected so this pins the sampling POINT rather than a
+   * stopwatch. With one record and one strategy the readings are, in order:
+   * the deadline's start, the top-of-loop check, the attempt's open, the
+   * attempt's close, and then the check after the loop. A clock that is still
+   * inside the budget for the first four and past it on the fifth exercises
+   * exactly the reading the defect was missing.
+   */
+  let readings = 0
+  const clock = () => (readings++ < 4 ? 0 : 10_000)
+  const { report } = benchRepairs({
+    corpusBytes: encode({
+      corpusVersion: '1',
+      schema: { type: 'object' },
+      records: [{ id: 'only', raw: '{"a": 1}', expected: { a: 1 } }],
+    }),
+    strategies: ['strict'],
+    limits: { maxMillis: 5 },
+    clock,
+  })
+
+  assert.equal(report.status, 'incomplete', `status ${report.status}; a run that overran its budget is not a verdict`)
+  const finding = report.findings.find((candidate) => candidate.ruleId === 'time-budget-exceeded')
+  assert.ok(finding !== undefined, `the budget was passed and nothing said so\n${JSON.stringify(report.findings, null, 2)}`)
+  assert.equal(finding.location.pointer, '/records/0', 'the finding does not name the record that overran')
+  assert.match(finding.message, /maxMillis budget of 5/)
+})
+
+test('a run that stays inside its budget is still a clean pass', () => {
+  // Without this the check above is satisfiable by reporting the budget always.
+  const { report } = benchRepairs({
+    corpusBytes: encode({
+      corpusVersion: '1',
+      schema: { type: 'object' },
+      records: [{ id: 'only', raw: '{"a": 1}', expected: { a: 1 } }],
+    }),
+    strategies: ['strict'],
+    limits: { maxMillis: 5 },
+    clock: () => 0,
+  })
+  assert.equal(report.status, 'pass')
+  assert.ok(!report.findings.some((finding) => finding.ruleId === 'time-budget-exceeded'))
+})
