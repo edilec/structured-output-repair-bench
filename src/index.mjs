@@ -533,8 +533,20 @@ function scoreAttempt(context) {
     return 'failed'
   }
 
-  score.parsed += 1
-
+  /*
+   * The depth gate comes BEFORE `parsed` is counted, and that ordering is the
+   * whole point.
+   *
+   * The documented model puts `record-too-deep` in the `abandoned` column
+   * alone, and states two identities a reader is told to trust:
+   * `parsed + failed + abandoned == attempted` and
+   * `faithful + altered == parsed`. Counting this attempt as parsed AND
+   * abandoned broke both -- measured as attempted 1, parsed 1, abandoned 1,
+   * faithful 0, altered 0 -- so the scoreboard printed a strategy whose columns
+   * did not add up. `parsed` therefore means "parsed and carried forward to
+   * scoring"; that the text itself parsed is what the `record-too-deep` finding
+   * says, naming the record and the strategy.
+   */
   const depth = measureDepth(parsed, limits.maxValueDepth)
   if (depth > limits.maxValueDepth) {
     score.abandoned += 1
@@ -543,11 +555,12 @@ function scoreAttempt(context) {
       file: corpusSource,
       position: entry.index,
       parts,
-      message: `The repair of record "${sanitize(entry.id, 60)}" by "${score.strategy}" nests deeper than the maxValueDepth limit of ${limits.maxValueDepth}; it was not scored.`,
+      message: `The repair of record "${sanitize(entry.id, 60)}" by "${score.strategy}" parsed but nests deeper than the maxValueDepth limit of ${limits.maxValueDepth}; it was not scored.`,
       suggestion: 'Raise --max-value-depth deliberately.',
     })
     return 'abandoned'
   }
+  score.parsed += 1
 
   state.checked += 1
   const schemaProblems = validateAgainstSchema(parsed, corpus.schema, limits, budget)

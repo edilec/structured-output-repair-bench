@@ -14,6 +14,7 @@ scoreboard column says.
 | 4 | the repaired text does not parse | `repair-failed` | `failed` |
 | 5 | the parsed value is deeper than `maxValueDepth` | `record-too-deep` | `abandoned` |
 | 6 | *(not an ending)* the value contradicts the schema | `schema-violation` | not `schemaValid` |
+| 6 | *(not an ending)* the `maxSteps` budget was already spent | `step-budget-exceeded` | not `schemaValid` |
 | 7 | the value is not the labelled value | `fidelity-violation` | `altered` |
 | 8 | — | — | `faithful` |
 
@@ -21,6 +22,19 @@ scoreboard column says.
 Those two identities are asserted on every strategy in
 `test/visibility.test.mjs`: a bench that dropped an inconvenient failure could
 still print a plausible table, but it could not keep the columns adding up.
+
+Step 5 is the reason `parsed` means "parsed and carried forward to scoring"
+rather than "the text parsed". An attempt counted in both `parsed` and
+`abandoned` breaks both identities at once, and it did: the identity test's
+corpus never reached this branch, so the assertion could not fail on the one
+path that broke it. It now has a case that does.
+
+Step 6 has a second, quieter ending. The validator short-circuits once the
+`maxSteps` budget is spent, so every validation after that returns an empty
+problem list — "nothing was looked at", not "nothing was wrong". Starving the
+budget therefore used to RAISE `schemaValid`, counting a value that contradicts
+the schema as satisfying it, with no finding naming the attempt. An attempt the
+validator never walked is not `schemaValid`, and says so by name.
 
 ## Why validity and fidelity are separate columns
 

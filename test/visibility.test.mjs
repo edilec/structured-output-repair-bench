@@ -156,3 +156,51 @@ test('a strategy that falls under an explicit fidelity floor fails the run', () 
   assert.equal(finding.location.pointer, '/strategies/strict')
   assert.match(finding.message, /repaired 0 of 2 record\(s\) faithfully, under the 50% floor/)
 })
+
+test('the columns still account for every attempt on the record-too-deep path', () => {
+  /*
+   * The identities above were asserted on a corpus that never reached this
+   * branch, so they could not fail on the one path that broke them.
+   *
+   * `scoreAttempt` incremented `parsed` and then ran the `maxValueDepth` check,
+   * which incremented `abandoned` as well. Measured: attempted 1, parsed 1,
+   * abandoned 1, faithful 0, altered 0 -- so `parsed + failed + abandoned` was
+   * 2 against 1 attempt, and `faithful + altered` was 0 against 1 parsed. The
+   * verdict was right (incomplete, exit 2) and the scoreboard a reader is told
+   * to trust did not add up.
+   *
+   * docs/measurement-model.md puts `record-too-deep` in the `abandoned` column
+   * alone, so `parsed` counts attempts carried forward to scoring.
+   */
+  const deep = { id: 'deep', raw: '{"a": {"b": {"c": 1}}}', expected: { a: { b: { c: 1 } } } }
+  const { report } = benchRepairs({
+    corpusBytes: encode({ corpusVersion: '1', schema: { type: 'object' }, records: [deep] }),
+    strategies: ['strict'],
+    limits: { maxValueDepth: 2 },
+  })
+
+  assert.ok(
+    report.findings.some((finding) => finding.ruleId === 'record-too-deep'),
+    'the fixture no longer reaches the branch this test exists for',
+  )
+  for (const score of report.strategies) {
+    assert.equal(
+      score.parsed + score.failed + score.abandoned,
+      score.attempted,
+      `${score.strategy}: ${score.attempted} attempt(s) do not add up: ${JSON.stringify(score)}`,
+    )
+    assert.equal(score.faithful + score.altered, score.parsed, `${score.strategy}: parsed attempts do not add up: ${JSON.stringify(score)}`)
+  }
+  assert.equal(report.summary.parsed + report.summary.failed + report.summary.abandoned, report.summary.attempts)
+  // And the same record inside the limit is scored normally, so the fix is not
+  // "stop counting things".
+  const within = benchRepairs({
+    corpusBytes: encode({ corpusVersion: '1', schema: { type: 'object' }, records: [deep] }),
+    strategies: ['strict'],
+  }).report
+  assert.equal(within.status, 'pass')
+  assert.deepEqual(
+    { parsed: within.strategies[0].parsed, faithful: within.strategies[0].faithful, abandoned: within.strategies[0].abandoned },
+    { parsed: 1, faithful: 1, abandoned: 0 },
+  )
+})
