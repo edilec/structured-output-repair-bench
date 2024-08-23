@@ -466,10 +466,26 @@ function runCorpus(context) {
   }
 }
 
+/**
+ * The rule a validator problem that is NOT a mismatch belongs to.
+ *
+ * `unsupported` and `schema` mean the validator does not model the constraint,
+ * and `schema-unsupported` says so. `budget` and `depth` are something else: a
+ * documented limit was reached, each has its own rule id and its own remedy,
+ * and filing them under the unsupported-keyword rule sends the reader to fix a
+ * schema that is fine.
+ */
+const LIMIT_PROBLEM_RULES = Object.freeze({
+  budget: 'step-budget-exceeded',
+  depth: 'record-too-deep',
+})
+
+const problemRule = (problem) => LIMIT_PROBLEM_RULES[problem.kind] ?? 'schema-unsupported'
+
 function reportLabelProblems(collector, problems, entry, corpusSource) {
   for (const problem of problems) {
     record(collector, {
-      ruleId: problem.kind === 'mismatch' ? 'label-invalid' : 'schema-unsupported',
+      ruleId: problem.kind === 'mismatch' ? 'label-invalid' : problemRule(problem),
       file: corpusSource,
       position: entry.index,
       parts: [...entry.parts, 'expected', ...problem.path],
@@ -563,6 +579,18 @@ function scoreAttempt(context) {
   score.parsed += 1
 
   state.checked += 1
+  /*
+   * "No problems" and "never asked" are not the same answer.
+   *
+   * `walk` short-circuits once `budget.spent` is set, so every validation after
+   * the budget runs out returns an empty list -- and `mismatches.length === 0
+   * && unanswered.length === 0` is then trivially true. Measured: a record
+   * whose value contradicts the schema was counted in `schemaValid` under
+   * `--max-steps 4`, raising the column to 2 of 2, with no finding naming it.
+   * The README defines `schemaValid` as "parsed values that satisfied the
+   * corpus schema"; a value nobody looked at satisfied nothing.
+   */
+  const validatorRan = !budget.spent
   const schemaProblems = validateAgainstSchema(parsed, corpus.schema, limits, budget)
   const mismatches = schemaProblems.filter((problem) => problem.kind === 'mismatch')
   const unanswered = schemaProblems.filter((problem) => problem.kind !== 'mismatch')
@@ -578,7 +606,7 @@ function scoreAttempt(context) {
   }
   for (const problem of unanswered) {
     record(collector, {
-      ruleId: 'schema-unsupported',
+      ruleId: problemRule(problem),
       file: corpusSource,
       position: entry.index,
       parts: [...parts, ...problem.path],
@@ -586,7 +614,17 @@ function scoreAttempt(context) {
       suggestion: 'Express the constraint with a modelled keyword, or accept that validity is unmeasured here.',
     })
   }
-  const schemaValid = mismatches.length === 0 && unanswered.length === 0
+  if (!validatorRan) {
+    record(collector, {
+      ruleId: 'step-budget-exceeded',
+      file: corpusSource,
+      position: entry.index,
+      parts,
+      message: `Schema validity for record "${sanitize(entry.id, 60)}" under "${score.strategy}" was not measured: the maxSteps budget of ${limits.maxSteps} was already spent before this attempt was validated.`,
+      suggestion: 'Raise --max-steps deliberately, or shorten the corpus.',
+    })
+  }
+  const schemaValid = validatorRan && mismatches.length === 0 && unanswered.length === 0
   if (schemaValid) score.schemaValid += 1
 
   /*

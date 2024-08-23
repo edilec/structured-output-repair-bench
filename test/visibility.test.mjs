@@ -204,3 +204,42 @@ test('the columns still account for every attempt on the record-too-deep path', 
     { parsed: 1, faithful: 1, abandoned: 0 },
   )
 })
+
+test('an attempt the step budget never validated is not counted as schema-valid', () => {
+  /*
+   * `walk` short-circuits once `budget.spent` is set, so every validation after
+   * the budget runs out returns an empty list -- and "no problems" is then
+   * indistinguishable from "never asked". Measured with `--max-steps 4`:
+   * `schemaValid` rose to 2 of 2, the higher number, and the record it counted
+   * holds {"n": "oops"} against {"n": {"type": "number"}}. The only finding was
+   * about the label, and said nothing about the attempt.
+   */
+  const records = [
+    { id: 'r1', raw: '{"n": 1}', expected: { n: 1 } },
+    { id: 'r2', raw: '{"n": "oops"}', expected: { n: 'oops' } },
+  ]
+  const schema = { type: 'object', properties: { n: { type: 'number' } } }
+  const run = (limits) => benchRepairs({
+    corpusBytes: encode({ corpusVersion: '1', schema, records }),
+    strategies: ['strict'],
+    limits,
+  }).report
+
+  // With a full budget the second record really is invalid, and is named.
+  const full = run(undefined)
+  assert.equal(full.status, 'fail')
+  assert.equal(full.strategies[0].schemaValid, 1)
+  assert.ok(full.findings.some((finding) => finding.ruleId === 'schema-violation'))
+
+  const starved = run({ maxSteps: 4 })
+  assert.equal(starved.status, 'incomplete')
+  assert.ok(
+    starved.strategies[0].schemaValid <= full.strategies[0].schemaValid,
+    `starving the budget RAISED schemaValid to ${starved.strategies[0].schemaValid}: ${JSON.stringify(starved.strategies[0])}`,
+  )
+  const named = starved.findings.filter((finding) => finding.ruleId === 'step-budget-exceeded')
+  assert.ok(
+    named.some((finding) => finding.location.pointer === '/records/1/strict'),
+    `no finding names the attempt that was not validated\n${JSON.stringify(starved.findings, null, 2)}`,
+  )
+})
