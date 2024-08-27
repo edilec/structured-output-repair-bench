@@ -152,18 +152,30 @@ unrepaired, and visibly so.
 | column | meaning |
 | --- | --- |
 | `attempted` | records this strategy was run over |
-| `parsed` | repaired text that `JSON.parse` accepted |
-| `schemaValid` | parsed values that satisfied the corpus schema |
+| `parsed` | repaired text `JSON.parse` accepted **and** carried forward to scoring |
+| `schemaValid` | parsed values the validator checked and found to satisfy the corpus schema |
 | `faithful` | parsed values structurally equal to the label |
 | `altered` | parsed values **not** equal to the label — the defect |
 | `failed` | attempts whose repaired text did not parse |
-| `abandoned` | attempts stopped by a budget, so never measured |
+| `abandoned` | attempts stopped by a budget or a value limit, so never measured |
 | `edits` | edits the pipeline applied |
 | `cost` | deterministic work units, standing in for latency in the report |
 
 `parsed + failed + abandoned` always equals `attempted`, and `faithful + altered`
 always equals `parsed`. A dropped failure could not balance those columns, which
 is how `test/visibility.test.mjs` pins that unsuccessful repairs stay visible.
+
+Two of those definitions are narrower than they look, and both narrowings are
+there because the wider reading was wrong:
+
+- An attempt whose text parsed but nests past `maxValueDepth` is `abandoned`
+  and **not** `parsed`. Counting it in both broke the identities above, on the
+  one path the identity test did not reach.
+- `schemaValid` counts only attempts the validator actually walked. Once the
+  `maxSteps` budget is spent, validation returns no problems because it looked
+  at nothing — which is not the same answer as "no problems", and starving the
+  budget must never raise this column. An attempt skipped that way is named by a
+  `step-budget-exceeded` finding pointing at the record and the strategy.
 
 ### Latency
 
