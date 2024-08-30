@@ -177,6 +177,13 @@ there because the wider reading was wrong:
   budget must never raise this column. An attempt skipped that way is named by a
   `step-budget-exceeded` finding pointing at the record and the strategy.
 
+A limit reached inside the validator is reported under its own rule —
+`step-budget-exceeded` or `record-too-deep` — **and** with its own remedy:
+raise that limit. It is never filed under `schema-unsupported`, whose remedy is
+to rewrite the schema, because the schema in that case is fine. The rule id and
+the suggestion have to move together; a finding that names the budget and then
+advises rewriting the schema is the same misdirection under a new label.
+
 ### Latency
 
 Latency **is** measured, per strategy, and written to **stderr**:
@@ -368,6 +375,7 @@ not by a test that agrees with a declaration.
 | a parse failure never reproduces the response | `test/parse-failure.test.mjs` |
 | latency is measured, and never reaches stdout | `test/latency.test.mjs`, `test/determinism.test.mjs` |
 | identical inputs produce byte-identical stdout | `test/determinism.test.mjs` |
+| a limit's rule id and its remedy move together | `test/remedy.test.mjs` |
 
 ## Repository layout
 

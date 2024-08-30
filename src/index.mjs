@@ -467,20 +467,34 @@ function runCorpus(context) {
 }
 
 /**
- * The rule a validator problem that is NOT a mismatch belongs to.
+ * The rule AND the remedy a validator problem that is NOT a mismatch belongs to.
  *
  * `unsupported` and `schema` mean the validator does not model the constraint,
- * and `schema-unsupported` says so. `budget` and `depth` are something else: a
- * documented limit was reached, each has its own rule id and its own remedy,
- * and filing them under the unsupported-keyword rule sends the reader to fix a
- * schema that is fine.
+ * and `schema-unsupported` says so; its remedy is to express the constraint
+ * with a keyword this validator models. `budget` and `depth` are something
+ * else: a documented limit was reached, the schema is fine, and the remedy is
+ * to raise that limit. The rule id and the suggestion have to move together --
+ * a `step-budget-exceeded` finding that still advises rewriting the schema
+ * sends the reader to fix a schema that is fine, which is the whole failure
+ * the rule id was split out to stop.
  */
+const UNSUPPORTED_RULE = 'schema-unsupported'
+const UNSUPPORTED_SUGGESTION =
+  'Express the constraint with a modelled keyword, or accept that validity is unmeasured here.'
+
 const LIMIT_PROBLEM_RULES = Object.freeze({
   budget: 'step-budget-exceeded',
   depth: 'record-too-deep',
 })
 
-const problemRule = (problem) => LIMIT_PROBLEM_RULES[problem.kind] ?? 'schema-unsupported'
+const LIMIT_PROBLEM_SUGGESTIONS = Object.freeze({
+  budget: 'Raise --max-steps deliberately, or shorten the corpus.',
+  depth: 'Raise --max-value-depth deliberately, or flatten the labelled value.',
+})
+
+const problemRule = (problem) => LIMIT_PROBLEM_RULES[problem.kind] ?? UNSUPPORTED_RULE
+
+const problemSuggestion = (problem) => LIMIT_PROBLEM_SUGGESTIONS[problem.kind] ?? UNSUPPORTED_SUGGESTION
 
 function reportLabelProblems(collector, problems, entry, corpusSource) {
   for (const problem of problems) {
@@ -492,7 +506,7 @@ function reportLabelProblems(collector, problems, entry, corpusSource) {
       message: `The LABEL of record "${sanitize(entry.id, 60)}" ${problem.kind === 'mismatch' ? 'contradicts the corpus schema' : 'could not be checked'}: ${problem.message}`,
       suggestion: problem.kind === 'mismatch'
         ? 'Correct the label or the schema; a bench cannot measure validity against a contradiction.'
-        : 'Express the constraint with a modelled keyword, or accept that validity is unmeasured here.',
+        : problemSuggestion(problem),
     })
   }
 }
@@ -611,7 +625,7 @@ function scoreAttempt(context) {
       position: entry.index,
       parts: [...parts, ...problem.path],
       message: `Schema validity for record "${sanitize(entry.id, 60)}" under "${score.strategy}" could not be decided: ${problem.message}`,
-      suggestion: 'Express the constraint with a modelled keyword, or accept that validity is unmeasured here.',
+      suggestion: problemSuggestion(problem),
     })
   }
   if (!validatorRan) {

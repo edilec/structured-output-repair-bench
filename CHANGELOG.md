@@ -55,3 +55,11 @@ First implementation.
 - A budget or depth limit reached during validation is reported under its own
   rule (`step-budget-exceeded`, `record-too-deep`) instead of under
   `schema-unsupported`, which named the wrong cause and the wrong remedy.
+- The remedy moves with the rule id. The rule was split out and the
+  `suggestion` string was left behind at both reporting sites, so a
+  `step-budget-exceeded` finding still advised "Express the constraint with a
+  modelled keyword" — the rewrite-your-schema advice the split exists to stop,
+  now under a rule id that contradicts it. Budget problems advise raising
+  `--max-steps` and depth problems advise raising `--max-value-depth`;
+  `test/remedy.test.mjs` pins all of it on the emitted findings, including the
+  case where an unmodelled keyword must keep the schema remedy.
