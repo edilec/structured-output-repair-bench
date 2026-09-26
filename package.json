@@ -1,0 +1,54 @@
+{
+  "name": "structured-output-repair-bench",
+  "version": "0.1.0",
+  "description": "Compare bounded JSON repair strategies on a labelled corpus of malformed model output, measuring schema validity, field fidelity, edit count and latency.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "lint": "node --check src/corpus.mjs && node --check src/document.mjs && node --check src/index.mjs && node --check src/repair.mjs && node --check src/schema.mjs && node --check src/text.mjs && node --check bin/structured-output-repair-bench.mjs && node --check test/cli.test.mjs && node --check test/complexity.test.mjs && node --check test/corpus.test.mjs && node --check test/determinism.test.mjs && node --check test/fidelity.test.mjs && node --check test/incompleteness.test.mjs && node --check test/latency.test.mjs && node --check test/limits.test.mjs && node --check test/ordering.test.mjs && node --check test/parse-failure.test.mjs && node --check test/remedy.test.mjs && node --check test/repair.test.mjs && node --check test/sanitising.test.mjs && node --check test/schema.test.mjs && node --check test/severity-behaviour.test.mjs && node --check test/text.test.mjs && node --check test/visibility.test.mjs",
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=src/**",
+    "example": "node bin/structured-output-repair-bench.mjs --corpus examples/corpus.json",
+    "example:failing": "node bin/structured-output-repair-bench.mjs --corpus examples/corpus-altered.json",
+    "example:pipelines": "node bin/structured-output-repair-bench.mjs --corpus examples/corpus.json --pipelines examples/pipelines.json --strategies strict,span-then-close,commas-only-naive",
+    "pack:check": "npm pack --dry-run",
+    "check": "npm run lint && npm test && npm run example && npm run example:pipelines && npm run pack:check"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/edilec/structured-output-repair-bench.git"
+  },
+  "bin": {
+    "structured-output-repair-bench": "./bin/structured-output-repair-bench.mjs"
+  },
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "files": [
+    "bin",
+    "src",
+    "examples",
+    "docs",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "json",
+    "repair",
+    "benchmark",
+    "structured-output",
+    "llm",
+    "json-schema",
+    "fidelity",
+    "cli"
+  ],
+  "author": "Edilec Private Limited",
+  "bugs": {
+    "url": "https://github.com/edilec/structured-output-repair-bench/issues"
+  },
+  "homepage": "https://github.com/edilec/structured-output-repair-bench#readme"
+}

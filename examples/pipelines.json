@@ -1,0 +1,19 @@
+{
+  "pipelinesVersion": "1",
+  "strategies": [
+    {
+      "name": "span-then-close",
+      "steps": [
+        "strip-code-fence",
+        "extract-json-span",
+        "close-delimiters"
+      ]
+    },
+    {
+      "name": "commas-only-naive",
+      "steps": [
+        "strip-trailing-commas"
+      ]
+    }
+  ]
+}
