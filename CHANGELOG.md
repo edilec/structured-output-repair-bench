@@ -3,7 +3,7 @@
 All notable changes to this project are documented here. Rule ids are part of
 the public surface: renaming one is a breaking change and is recorded here.
 
-## 0.1.0
+## 0.1.0 — 2026-10-14
 
 First implementation.
 
@@ -26,7 +26,7 @@ First implementation.
   described in the Edilec tool report contract v1. Latency is reported on
   stderr so that stdout stays byte-identical for identical inputs.
 
-## Unreleased
+Updates included in the first GitHub source release:
 
 ### Fixed
 
